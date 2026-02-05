@@ -21,7 +21,7 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 runpodctl doctor                    # First time setup (API key + SSH)
 runpodctl gpu list                  # See available GPUs
 runpodctl template search pytorch   # Find a template
-runpodctl pod create --template-id runpod-torch-v21 --gpu-type-id "NVIDIA RTX 4090"  # Create from template
+runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA RTX 4090"  # Create from template
 runpodctl pod list                  # List your pods
 ```
 
@@ -34,8 +34,8 @@ API key: https://runpod.io/console/user/settings
 ```bash
 runpodctl pod list                                    # List all pods
 runpodctl pod get <pod-id>                            # Get pod details (includes SSH info)
-runpodctl pod create --template-id runpod-torch-v21 --gpu-type-id "NVIDIA RTX 4090"  # Create from template
-runpodctl pod create --image "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04" --gpu-type-id "NVIDIA RTX 4090"  # Create with image
+runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA RTX 4090"  # Create from template
+runpodctl pod create --image "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04" --gpu-id "NVIDIA RTX 4090"  # Create with image
 runpodctl pod create --compute-type cpu --image ubuntu:22.04  # Create CPU pod
 runpodctl pod start <pod-id>                          # Start stopped pod
 runpodctl pod stop <pod-id>                           # Stop running pod
@@ -45,7 +45,7 @@ runpodctl pod update <pod-id> --name "new"            # Update pod
 runpodctl pod delete <pod-id>                         # Delete pod
 ```
 
-**Create flags:** `--template-id`, `--image`, `--name`, `--gpu-type-id`, `--gpu-count`, `--compute-type`, `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
+**Create flags:** `--template-id`, `--image`, `--name`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
 
 ### Serverless (alias: sls)
 
@@ -57,7 +57,7 @@ runpodctl serverless update <endpoint-id> --workers-max 5       # Update endpoin
 runpodctl serverless delete <endpoint-id>             # Delete endpoint
 ```
 
-**Create flags:** `--name`, `--template-id`, `--gpu-type-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--data-center-ids`
+**Create flags:** `--name`, `--template-id`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--data-center-ids`
 
 ### Templates (alias: tpl)
 
