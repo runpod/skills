@@ -4,6 +4,10 @@ Skills for AI agents to manage GPU workloads on Runpod.
 
 ## Available Skills
 
+### flash
+
+Complete knowledge of the runpod-flash framework - SDK, CLI, architecture, deployment, and codebase. Use when working with runpod-flash code, writing `@remote` functions, configuring resources, debugging deployments, or understanding the framework internals.
+
 ### runpod
 
 Manage GPU pods, serverless endpoints, templates, and volumes.
@@ -56,6 +60,13 @@ https://api.runpod.ai/v2/<endpoint-id>/status/<job-id>  # Job status
 ## Structure
 
 ```
+flash/
+├── SKILL.md
+└── references/
+    ├── ARCHITECTURE.md
+    ├── CLI_COMMANDS.md
+    ├── GETTING_STARTED.md
+    └── SDK_API.md
 runpod/
 └── SKILL.md
 ```
