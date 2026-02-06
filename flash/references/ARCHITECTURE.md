@@ -72,7 +72,7 @@ Flash Deploy uses a coordinator (Mothership) + distributed worker (Child Endpoin
 
 ### Reconciliation Logic
 
-`MothershipsProvisioner` (`src/runpod_flash/runtime/mothership_provisioner.py`):
+`MothershipsProvisioner`:
 
 1. Load local manifest from `.flash/` (desired state)
 2. Fetch persisted state from State Manager (previous state)
@@ -99,18 +99,10 @@ Flash Deploy uses a coordinator (Mothership) + distributed worker (Child Endpoin
 
 ### Cross-Endpoint Routing
 
-**Location**: `src/runpod_flash/runtime/`
-
 1. `ProductionWrapper` intercepts function call at stub layer
 2. `ServiceRegistry` loads manifest and looks up function
 3. If function's resource == current endpoint: execute locally
 4. If function's resource != current endpoint: serialize and POST remotely
-
-**Components**:
-- `ProductionWrapper` (`production_wrapper.py`) - Routes local vs remote
-- `ServiceRegistry` (`service_registry.py`) - Function-to-endpoint mapping
-- `ManifestFetcher` (`manifest_fetcher.py`) - Loads manifest with caching (TTL 300s)
-- `StateManagerClient` (`state_manager_client.py`) - GraphQL persistence
 
 **Serialization**: cloudpickle + base64, max 10MB
 **Caching**: Manifest cached 300s, endpoint URLs cached 300s
@@ -125,53 +117,7 @@ Flash Deploy uses a coordinator (Mothership) + distributed worker (Child Endpoin
 | `RUNPOD_ENDPOINT_ID` | All | Auto-set | Endpoint identification |
 | `FLASH_MANIFEST_PATH` | All | No | Override manifest location |
 
-### Key Runtime Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| `generic_handler` | `runtime/generic_handler.py` | Queue-based RunPod handler factory |
-| `lb_handler` | `runtime/lb_handler.py` | Load-balanced FastAPI handler factory |
-| `ServiceRegistry` | `runtime/service_registry.py` | Function routing and discovery |
-| `ManifestFetcher` | `runtime/manifest_fetcher.py` | Manifest loading + caching |
-| `MothershipsProvisioner` | `runtime/mothership_provisioner.py` | Reconciliation |
-| `StateManagerClient` | `runtime/state_manager_client.py` | GraphQL state persistence |
-| `ProductionWrapper` | `runtime/production_wrapper.py` | Local/remote execution routing |
-| `CircuitBreakerRegistry` | `runtime/circuit_breaker.py` | Endpoint circuit breakers |
-| `LoadBalancer` | `runtime/load_balancer.py` | Endpoint selection strategies |
-| `RetryManager` | `runtime/retry_manager.py` | Exponential backoff retries |
-| `MetricsCollector` | `runtime/metrics.py` | Structured logging metrics |
-
-### Handler Routing
-
-**Queue-Based** (`generic_handler.py`):
-```python
-def handler(job):
-    job_input = job["input"]
-    function_name = job_input["function_name"]
-    args, kwargs = deserialize_arguments(job_input)
-    func = function_registry[function_name]
-    result = execute_function(func, args, kwargs)
-    return {"success": True, "result": serialize_result(result)}
-```
-
-**Load-Balanced** (`lb_handler.py`):
-- FastAPI app with user-defined HTTP routes
-- `/execute` endpoint for `@remote` calls (LiveLoadBalancer only)
-- User routes registered from manifest
-
-### Resource Manager
-
-**Location**: `src/runpod_flash/core/resources/resource_manager.py`
-
-- Singleton pattern (`SingletonMixin`)
-- Stores state in `.runpod/resources.pkl` with file locking
-- Tracks config hashes for drift detection
-- `get_or_deploy_resource()`: Provisions if needed, returns existing if unchanged
-- Auto-migrates legacy resource formats
-
 ### Flash Apps & Environments
-
-**Location**: `src/runpod_flash/core/resources/app.py`
 
 - **FlashApp**: Top-level container per project
 - **FlashEnvironment**: Named deployment target (e.g., "production", "staging")
@@ -190,7 +136,7 @@ Lifecycle:
 - **Retry Manager**: Exponential backoff with configurable max attempts
 - **Metrics**: Structured logging for circuit breaker, retry, and LB events
 
-Configuration via `ReliabilityConfig` (`runtime/reliability_config.py`):
+Configuration via `ReliabilityConfig`:
 ```python
 ReliabilityConfig(
     circuit_breaker=CircuitBreakerConfig(failure_threshold=5, recovery_timeout=30),

@@ -30,8 +30,6 @@ from runpod_flash import (
 
 ## @remote Decorator - Complete Reference
 
-**Location**: `src/runpod_flash/client.py`
-
 ```python
 def remote(
     resource_config: ServerlessResource,
@@ -86,8 +84,6 @@ When `resource_config` is `LoadBalancerSlsResource`:
 
 ### ServerlessResource (Base)
 
-**Location**: `src/runpod_flash/core/resources/serverless.py`
-
 ```python
 class ServerlessResource(DeployableResource):
     name: str                     # Required, unique endpoint name
@@ -109,8 +105,6 @@ class ServerlessResource(DeployableResource):
 
 ### LiveServerless
 
-**Location**: `src/runpod_flash/core/resources/live_serverless.py`
-
 Extends `ServerlessEndpoint` with `LiveServerlessMixin`:
 - Fixed optimized Docker image (cannot be overridden)
 - Full remote Python function execution via cloudpickle
@@ -129,8 +123,6 @@ config = LiveServerless(
 ```
 
 ### LoadBalancerSlsResource
-
-**Location**: `src/runpod_flash/core/resources/load_balancer_sls_resource.py`
 
 Key differences from ServerlessResource:
 - Always `type=LB` (enforced, cannot override)
@@ -168,8 +160,6 @@ config = CpuLiveServerless(name="cpu-worker", workersMax=5)
 
 ### PodTemplate
 
-**Location**: `src/runpod_flash/core/resources/template.py`
-
 Override pod-level settings:
 
 ```python
@@ -185,8 +175,6 @@ config = LiveServerless(name="worker", template=template)
 
 ### NetworkVolume
 
-**Location**: `src/runpod_flash/core/resources/network_volume.py`
-
 ```python
 from runpod_flash import NetworkVolume, DataCenter
 
@@ -198,8 +186,6 @@ volume = NetworkVolume(
 ```
 
 ## GPU Groups - Complete Reference
-
-**Location**: `src/runpod_flash/core/resources/gpu.py`
 
 ```python
 class GpuGroup(Enum):
@@ -216,8 +202,6 @@ class GpuGroup(Enum):
 ```
 
 ## CPU Instance Types - Complete Reference
-
-**Location**: `src/runpod_flash/core/resources/cpu.py`
 
 Format: `CPU{generation}{type}_{vcpu}_{memory_gb}`
 
@@ -260,8 +244,6 @@ except Exception as e:
 ```
 
 ### Runtime Exceptions
-
-**Location**: `src/runpod_flash/runtime/exceptions.py`
 
 ```
 FlashRuntimeError (base)

@@ -11,9 +11,8 @@ allowed-tools: Read, Grep, Glob, Bash
 
 - **Package**: `pip install runpod-flash`
 - **Import**: `from runpod_flash import remote, LiveServerless, GpuGroup, ...`
-- **CLI**: `flash` (entry point: `src/runpod_flash/cli/main.py`)
+- **CLI**: `flash`
 - **Python**: >=3.10, <3.15
-- **Source layout**: `src/runpod_flash/`
 
 ## Getting Started
 
@@ -239,81 +238,6 @@ Build artifacts: `.flash/.build/`, `.flash/artifact.tar.gz`, `.flash/flash_manif
 
 ## Architecture Overview
 
-### Source Structure
-
-```
-src/runpod_flash/
-  __init__.py              # Public API exports (lazy-loaded)
-  client.py                # @remote decorator implementation
-  config.py                # FlashPaths configuration
-  execute_class.py         # Remote class execution
-  logger.py                # Logging setup
-  cli/
-    main.py                # Typer CLI entry point
-    commands/
-      init.py, run.py, build.py, deploy.py, undeploy.py, env.py, apps.py
-      build_utils/
-        scanner.py         # RemoteDecoratorScanner - finds @remote
-        manifest.py        # ManifestBuilder - creates flash_manifest.json
-        handler_generator.py, lb_handler_generator.py
-  core/
-    api/runpod.py          # RunpodGraphQLClient, RunpodRestClient
-    deployment.py          # DeploymentOrchestrator
-    discovery.py           # ResourceDiscovery
-    resources/
-      base.py              # BaseResource, DeployableResource (ABC)
-      serverless.py        # ServerlessResource, ServerlessEndpoint
-      serverless_cpu.py    # CpuEndpointMixin, CpuServerlessEndpoint
-      live_serverless.py   # LiveServerless, CpuLiveServerless, LiveLoadBalancer, etc.
-      load_balancer_sls_resource.py  # LoadBalancerSlsResource
-      network_volume.py    # NetworkVolume, DataCenter
-      resource_manager.py  # ResourceManager (singleton)
-      template.py          # PodTemplate
-      gpu.py               # GpuGroup, GpuType enums
-      cpu.py               # CpuInstanceType enum
-      app.py               # FlashApp
-    utils/
-      singleton.py, file_lock.py, lru_cache.py, backoff.py
-  runtime/
-    generic_handler.py     # Queue-based handler factory
-    lb_handler.py          # Load-balanced (FastAPI) handler factory
-    service_registry.py    # ServiceRegistry - function routing
-    manifest_fetcher.py    # ManifestFetcher - loads manifest
-    mothership_provisioner.py  # Reconciliation logic
-    state_manager_client.py    # GraphQL state persistence
-    production_wrapper.py  # Routes local vs remote execution
-    serialization.py       # cloudpickle + base64
-    circuit_breaker.py, load_balancer.py, retry_manager.py, metrics.py
-    reliability_config.py, models.py, config.py, exceptions.py
-  stubs/
-    live_serverless.py     # LiveServerlessStub
-    serverless.py, load_balancer_sls.py, registry.py
-  protos/
-    remote_execution.py    # FunctionRequest/FunctionResponse models
-```
-
-### Class Hierarchy
-
-```
-BaseResource (Pydantic BaseModel)
-  DeployableResource (ABC)
-    ServerlessResource
-      ServerlessEndpoint
-      LoadBalancerSlsResource
-        CpuLoadBalancerSlsResource
-    NetworkVolume
-
-LiveServerlessMixin
-  LiveServerless (+ ServerlessEndpoint)
-  CpuLiveServerless (+ CpuServerlessEndpoint)
-  LiveLoadBalancer (+ LoadBalancerSlsResource)
-  CpuLiveLoadBalancer (+ CpuLoadBalancerSlsResource)
-
-CpuEndpointMixin
-  CpuServerlessEndpoint (+ ServerlessEndpoint)
-  CpuLoadBalancerSlsResource (+ LoadBalancerSlsResource)
-```
-
 ### Deployment Architecture
 
 **Mothership Pattern**: Coordinator endpoint + distributed child endpoints.
@@ -340,32 +264,6 @@ Functions on different endpoints can call each other transparently:
 
 **Serialization**: cloudpickle + base64, max 10MB payload.
 
-## Development Workflow
-
-```bash
-make dev          # Install in editable mode
-make test-unit    # Run unit tests (parallel)
-make test         # Run all tests
-make lint         # Ruff check
-make format       # Ruff format
-make index        # Rebuild code intel index
-make build        # Build PyPI package
-```
-
-- Tests: `pytest` with `pytest-asyncio`, `pytest-xdist` (parallel), `pytest-cov`
-- Coverage threshold: 65%
-- Linting: `ruff` (target py310, line-length 88)
-- Type checking: `mypy` (lenient config)
-
-## Key Design Patterns
-
-- **Singleton**: `ResourceManager` (thread-safe via `SingletonMixin`)
-- **File Locking**: Cross-platform locks for `.runpod/resources.pkl`
-- **Config Hashing**: Drift detection via hash comparison
-- **Lazy Loading**: `__init__.py` uses `__getattr__` for fast CLI startup
-- **Manifest-Driven**: JSON manifest is the contract between build and runtime
-- **Peer-to-Peer**: All endpoints query State Manager GraphQL directly (no hub)
-
 ## Common Gotchas
 
 1. **External scope in @remote functions** - Most common error. Everything must be inside.
@@ -383,12 +281,3 @@ For more details, see the reference files in this skill:
 - [Architecture & Deployment](references/ARCHITECTURE.md) - Deployment flow, manifest system, state management
 - [CLI Commands](references/CLI_COMMANDS.md) - All CLI commands with examples
 
-Or in the codebase docs/ directory:
-- `docs/Flash_SDK_Reference.md` - Full SDK reference
-- `docs/Flash_Deploy_Guide.md` - Deployment architecture spec
-- `docs/Deployment_Architecture.md` - Deployment diagrams
-- `docs/Cross_Endpoint_Routing.md` - Cross-endpoint routing
-- `docs/Load_Balancer_Endpoints.md` - Load-balanced endpoints
-- `docs/Flash_Apps_and_Environments.md` - Apps & environments
-- `docs/Using_Remote_With_LoadBalancer.md` - @remote with LB
-- `docs/LoadBalancer_Runtime_Architecture.md` - LB runtime details
