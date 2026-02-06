@@ -61,12 +61,7 @@ https://api.runpod.ai/v2/<endpoint-id>/status/<job-id>  # Job status
 
 ```
 flash/
-├── SKILL.md
-└── references/
-    ├── ARCHITECTURE.md
-    ├── CLI_COMMANDS.md
-    ├── GETTING_STARTED.md
-    └── SDK_API.md
+└── SKILL.md
 runpod/
 └── SKILL.md
 ```

@@ -5,7 +5,7 @@ user-invocable: true
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
-# Runpod Flash - Complete Framework Knowledge
+# Runpod Flash
 
 **runpod-flash** (v1.0.0) is a Python SDK for distributed execution of AI workloads on RunPod's serverless infrastructure. Write Python functions locally, decorate with `@remote`, and Flash handles GPU/CPU provisioning, dependency management, and data transfer.
 
@@ -30,7 +30,7 @@ Get a key from [RunPod account settings](https://docs.runpod.io/get-started/api-
 export RUNPOD_API_KEY=your_api_key_here
 ```
 
-Or save in a `.env` file in your project directory:
+Or save in a `.env` file in your project directory (Flash auto-loads via `python-dotenv`):
 
 ```bash
 echo "RUNPOD_API_KEY=your_api_key_here" > .env
@@ -58,16 +58,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-```bash
-python your_script.py
-```
-
 First run takes ~1 minute (endpoint provisioning). Subsequent runs take ~1 second.
 
 ### 4. Or create a Flash API project
 
 ```bash
-flash init my_project        # Generate project template
+flash init my_project
 cd my_project
 pip install -r requirements.txt
 # Edit .env and add your RUNPOD_API_KEY
@@ -88,8 +84,6 @@ flash deploy list                        # List environments
 flash deploy info production             # Show details
 flash deploy delete production           # Tear down
 ```
-
-For the full getting started guide with examples, see [references/GETTING_STARTED.md](references/GETTING_STARTED.md).
 
 ## Core Concept: The @remote Decorator
 
@@ -148,6 +142,7 @@ async def good(data):
 ```
 
 ### Return Behavior
+
 - Decorated function is always awaitable (`await my_func(...)`)
 - Queue-based resources return `JobOutput` with `.output`, `.error`, `.status`
 - Load-balanced resources return your dict directly
@@ -170,7 +165,7 @@ Choose based on execution model and environment:
 **Queue-based**: Best for batch, long-running tasks, automatic retries.
 **Load-balanced**: Best for real-time APIs, low-latency, direct HTTP routing.
 
-**Live* classes**: Fixed optimized Docker image, full remote code execution.
+**Live\* classes**: Fixed optimized Docker image, full remote code execution.
 **Non-Live classes**: Custom Docker images, dictionary payload only.
 
 ### Common Parameters
@@ -203,38 +198,265 @@ LiveServerless(
 
 ### CPU Instance Types (CpuInstanceType enum)
 
-Format: `CPU{gen}{type}_{vcpu}_{memory_gb}` (e.g., `CPU5C_4_8`)
-- Generations: 3, 5
-- Types: G (general), C (compute-optimized)
-- Use with `instanceIds` parameter on LiveServerless
+Format: `CPU{generation}{type}_{vcpu}_{memory_gb}`
+
+| Instance Type | Gen | Type | vCPU | RAM |
+|--------------|-----|------|------|-----|
+| `CPU3G_1_4` | 3rd | General | 1 | 4GB |
+| `CPU3G_2_8` | 3rd | General | 2 | 8GB |
+| `CPU3G_4_16` | 3rd | General | 4 | 16GB |
+| `CPU3G_8_32` | 3rd | General | 8 | 32GB |
+| `CPU3C_1_2` | 3rd | Compute | 1 | 2GB |
+| `CPU3C_2_4` | 3rd | Compute | 2 | 4GB |
+| `CPU3C_4_8` | 3rd | Compute | 4 | 8GB |
+| `CPU3C_8_16` | 3rd | Compute | 8 | 16GB |
+| `CPU5C_1_2` | 5th | Compute | 1 | 2GB |
+| `CPU5C_2_4` | 5th | Compute | 2 | 4GB |
+| `CPU5C_4_8` | 5th | Compute | 4 | 8GB |
+| `CPU5C_8_16` | 5th | Compute | 8 | 16GB |
+
+Use with `instanceIds` parameter:
+
+```python
+config = LiveServerless(
+    name="cpu-worker",
+    instanceIds=[CpuInstanceType.CPU5C_4_8],
+    workersMax=5,
+)
+```
+
+Or use explicit CPU classes:
+
+```python
+from runpod_flash import CpuLiveServerless
+config = CpuLiveServerless(name="cpu-worker", workersMax=5)
+```
+
+### PodTemplate
+
+Override pod-level settings:
+
+```python
+from runpod_flash import PodTemplate
+
+template = PodTemplate(
+    containerDiskInGb=100,
+    env=[{"key": "PYTHONPATH", "value": "/workspace"}],
+)
+
+config = LiveServerless(name="worker", template=template)
+```
+
+### NetworkVolume
+
+```python
+from runpod_flash import NetworkVolume, DataCenter
+
+volume = NetworkVolume(
+    name="model-storage",
+    size=100,  # GB
+    dataCenterId=DataCenter.EU_RO_1,
+)
+```
+
+### LoadBalancer Resources
+
+When using `LoadBalancerSlsResource` or `LiveLoadBalancer`:
+- `method` and `path` are **required** on `@remote`
+- `path` must start with "/"
+- `method` must be one of: GET, POST, PUT, DELETE, PATCH
+
+```python
+from runpod_flash import remote, LiveLoadBalancer
+
+api = LiveLoadBalancer(name="api-service")
+
+@remote(api, method="POST", path="/api/process")
+async def process(x: int, y: int):
+    return {"result": x + y}
+
+@remote(api, method="GET", path="/api/health")
+def health():
+    return {"status": "ok"}
+```
+
+Key differences from queue-based:
+- Direct HTTP routing (no queue), lower latency
+- Returns dict directly (no JobOutput wrapper)
+- No automatic retries
+
+## Error Handling
+
+### Queue-Based Resources
+
+```python
+job_output = await my_function(data)
+if job_output.error:
+    print(f"Failed: {job_output.error}")
+else:
+    result = job_output.output
+```
+
+`JobOutput` fields: `id`, `status`, `output`, `error`, `started_at`, `ended_at`
+
+### Load-Balanced Resources
+
+```python
+try:
+    result = await my_function(data)  # Returns dict directly
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### Runtime Exceptions
+
+```
+FlashRuntimeError (base)
+  RemoteExecutionError      # Remote function failed
+  SerializationError        # cloudpickle serialization failed
+  GraphQLError              # GraphQL base error
+    GraphQLMutationError    # Mutation failed
+    GraphQLQueryError       # Query failed
+  ManifestError             # Invalid/missing manifest
+  ManifestServiceUnavailableError  # State Manager unreachable
+```
+
+## Common Patterns
+
+### Hybrid GPU/CPU Pipeline
+
+```python
+from runpod_flash import remote, LiveServerless, CpuInstanceType
+
+cpu_config = LiveServerless(name="preprocessor", instanceIds=[CpuInstanceType.CPU5C_4_8])
+gpu_config = LiveServerless(name="inference", gpus=[GpuGroup.AMPERE_80])
+
+@remote(resource_config=cpu_config, dependencies=["pandas"])
+async def preprocess(data):
+    import pandas as pd
+    return pd.DataFrame(data).to_dict('records')
+
+@remote(resource_config=gpu_config, dependencies=["torch"])
+async def inference(data):
+    import torch
+    tensor = torch.tensor(data, device="cuda")
+    return {"result": tensor.sum().item()}
+
+async def pipeline(raw_data):
+    clean = await preprocess(raw_data)
+    return await inference(clean)
+```
+
+### Parallel Execution
+
+```python
+results = await asyncio.gather(
+    process_item(item1),
+    process_item(item2),
+    process_item(item3),
+)
+```
+
+### Local Testing
+
+```python
+@remote(resource_config=config, local=True)
+async def my_function(data):
+    return {"status": "ok"}  # Runs locally, skips remote
+```
+
+### Cost Optimization
+
+- Use `workersMin=0` to scale from zero
+- Use `idleTimeout=600` to reduce churn
+- Use smaller GPUs if they fit your model
+- Use `Live*` classes for spot pricing in dev
+- Pass URLs/paths instead of large data objects
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `flash init [name]` | Initialize project with template |
-| `flash run [--auto-provision]` | Start local FastAPI dev server |
-| `flash build [--exclude pkg1,pkg2] [--keep-build] [--preview]` | Build deployment artifact |
-| `flash deploy new <env>` | Create deployment environment |
-| `flash deploy send <env>` | Deploy archive to environment |
-| `flash deploy list` | List environments |
-| `flash deploy info <env>` | Show environment details |
-| `flash deploy delete <env>` | Delete environment |
-| `flash undeploy [name\|list]` | Undeploy resources |
-| `flash env list\|create\|info\|delete` | Environment management |
-| `flash app list\|get` | App management |
+### flash init
 
-### Build Process
+```bash
+flash init [project_name]
+```
 
-1. **Scan**: Find `@remote` decorated functions
-2. **Group**: Group functions by `resource_config`
-3. **Manifest**: Create `flash_manifest.json` (function-to-endpoint map)
-4. **Dependencies**: Install for Linux x86_64
-5. **Package**: Bundle into `.flash/artifact.tar.gz`
+Creates a project template:
 
-Build artifacts: `.flash/.build/`, `.flash/artifact.tar.gz`, `.flash/flash_manifest.json`
+```
+project_name/
+├── main.py                # FastAPI entry point
+├── workers/
+│   ├── gpu/__init__.py    # GPU router
+│   │   └── endpoint.py    # GPU @remote function
+│   └── cpu/__init__.py    # CPU router
+│       └── endpoint.py    # CPU @remote function
+├── .env                   # API key template
+├── .gitignore
+├── .flashignore           # Deployment ignore patterns
+├── requirements.txt
+└── README.md
+```
 
-**500MB deployment limit** - use `--exclude` for packages in base image.
+### flash run
+
+```bash
+flash run [--auto-provision] [--host HOST] [--port PORT]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--auto-provision` | off | Pre-deploy all endpoints before serving |
+| `--host` | `localhost` | Server host (or `FLASH_HOST` env) |
+| `--port` | `8888` | Server port (or `FLASH_PORT` env) |
+
+### flash build
+
+```bash
+flash build [--exclude PACKAGES] [--keep-build] [--preview]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--exclude pkg1,pkg2` | Skip packages already in base Docker image |
+| `--keep-build` | Don't delete `.flash/.build/` after packaging |
+| `--preview` | Build then run in local Docker containers |
+
+Build steps: scan `@remote` decorators, group by resource config, create `flash_manifest.json`, install dependencies for Linux x86_64, package into `.flash/artifact.tar.gz`.
+
+**500MB deployment limit** - use `--exclude` for packages in base image:
+
+```bash
+flash build --exclude torch,torchvision,torchaudio
+```
+
+**`--preview` mode**: Creates Docker containers per resource config, starts mothership on `localhost:8000`, enables end-to-end local testing.
+
+### flash deploy
+
+```bash
+flash deploy new <env_name> [--app-name NAME]   # Create environment
+flash deploy send <env_name> [--app-name NAME]   # Deploy archive
+flash deploy list [--app-name NAME]               # List environments
+flash deploy info <env_name> [--app-name NAME]    # Show details
+flash deploy delete <env_name> [--app-name NAME]  # Delete (double confirmation)
+```
+
+`flash deploy send` requires `flash build` to have been run first.
+
+### flash undeploy
+
+```bash
+flash undeploy list          # List all deployed resources
+flash undeploy <name>        # Undeploy specific resource
+```
+
+### flash env / flash app
+
+```bash
+flash env list|create|info|delete <name>   # Environment management
+flash app list|get <name>                  # App management
+```
 
 ## Architecture Overview
 
@@ -247,12 +469,6 @@ Build artifacts: `.flash/.build/`, `.flash/artifact.tar.gz`, `.flash/flash_manif
 3. Mothership boots, reconciles desired vs current state
 4. Child endpoints query State Manager GraphQL for service discovery (peer-to-peer)
 5. Functions route locally or remotely based on manifest
-
-**Key env vars**:
-- `FLASH_IS_MOTHERSHIP=true` - Mothership role
-- `FLASH_RESOURCE_NAME` - Child endpoint identity
-- `RUNPOD_API_KEY` - API authentication
-- `RUNPOD_ENDPOINT_ID` - Set by RunPod platform
 
 ### Cross-Endpoint Routing
 
@@ -273,11 +489,5 @@ Functions on different endpoints can call each other transparently:
 5. **Large serialization** - Pass URLs/paths, not large data objects.
 6. **Imports at module level** - Import inside `@remote` functions, not at top of file.
 7. **LoadBalancer requires method+path** - `@remote(config, method="POST", path="/api/x")`
-
-## Detailed References
-
-For more details, see the reference files in this skill:
-- [SDK API Reference](references/SDK_API.md) - Complete @remote signature, resource classes, GPU/CPU types, patterns
-- [Architecture & Deployment](references/ARCHITECTURE.md) - Deployment flow, manifest system, state management
-- [CLI Commands](references/CLI_COMMANDS.md) - All CLI commands with examples
-
+8. **Bundle too large (>500MB)** - Use `--exclude` for packages in base Docker image.
+9. **Endpoints accumulate** - Clean up with `flash undeploy list` / `flash undeploy <name>`.
