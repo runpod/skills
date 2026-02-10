@@ -8,9 +8,9 @@ Skills for AI agents to manage GPU workloads on Runpod.
 
 Complete knowledge of the runpod-flash framework - SDK, CLI, architecture, deployment, and codebase. Use when working with runpod-flash code, writing `@remote` functions, configuring resources, debugging deployments, or understanding the framework internals.
 
-### runpod
+### runpodctl
 
-Manage GPU pods, serverless endpoints, templates, and volumes.
+Manage GPU pods, serverless endpoints, templates, volumes, and models.
 
 ## Installation
 
@@ -23,7 +23,7 @@ Works with Claude Code, Cursor, GitHub Copilot, Windsurf, Cline, and [17+ other 
 ## Setup
 
 ```bash
-runpod doctor
+runpodctl doctor
 ```
 
 ## Usage
@@ -62,7 +62,7 @@ https://api.runpod.ai/v2/<endpoint-id>/status/<job-id>  # Job status
 ```
 flash/
 └── SKILL.md
-runpod/
+runpodctl/
 └── SKILL.md
 ```
 
