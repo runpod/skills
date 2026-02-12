@@ -32,10 +32,11 @@ API key: https://runpod.io/console/user/settings
 ### Pods
 
 ```bash
-runpodctl pod list                                    # List all pods
-runpodctl pod list --status running                   # Filter by status (running, exited, etc.)
-runpodctl pod list --since 24h                        # Pods active in last 24 hours
-runpodctl pod list --created-after 2024-01-01         # Pods created after date
+runpodctl pod list                                    # List running pods (default, like docker ps)
+runpodctl pod list --all                              # List all pods including exited
+runpodctl pod list --status exited                    # Filter by status (RUNNING, EXITED, etc.)
+runpodctl pod list --since 24h                        # Pods created within last 24 hours
+runpodctl pod list --created-after 2025-01-15         # Pods created after date
 runpodctl pod get <pod-id>                            # Get pod details (includes SSH info)
 runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA RTX 4090"  # Create from template
 runpodctl pod create --image "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04" --gpu-id "NVIDIA RTX 4090"  # Create with image
@@ -48,7 +49,7 @@ runpodctl pod update <pod-id> --name "new"            # Update pod
 runpodctl pod delete <pod-id>                         # Delete pod
 ```
 
-**List flags:** `--status`, `--since`, `--created-after`, `--gpu-id`, `--compute-type`
+**List flags:** `--all` / `-a`, `--status`, `--since`, `--created-after`, `--gpu-id`, `--compute-type`
 
 **Create flags:** `--template-id` (required if no `--image`), `--image` (required if no `--template-id`), `--name`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--ssh` (default true), `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
 
