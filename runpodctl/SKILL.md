@@ -21,13 +21,17 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 # macOS (Homebrew)
 brew install runpod/runpodctl/runpodctl
 
-# Linux / macOS (manual)
+# macOS (manual — universal binary)
+curl -sL https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-darwin-all.tar.gz | tar xz -C ~/.local/bin
+
+# Linux
 curl -sL https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-linux-amd64.tar.gz | tar xz -C ~/.local/bin
-# Replace "linux-amd64" with: darwin-arm64 (Apple Silicon), darwin-amd64 (Intel Mac)
 
 # Windows (PowerShell)
 Invoke-WebRequest -Uri https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-windows-amd64.zip -OutFile runpodctl.zip; Expand-Archive runpodctl.zip -DestinationPath $env:LOCALAPPDATA\runpodctl; $env:PATH += ";$env:LOCALAPPDATA\runpodctl"
 ```
+
+Ensure `~/.local/bin` is on your `PATH` (add `export PATH="$HOME/.local/bin:$PATH"` to `~/.bashrc` or `~/.zshrc`).
 
 ## Quick start
 
