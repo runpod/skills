@@ -15,6 +15,20 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 
 > **Spelling:** "Runpod" (capital R). Command is `runpodctl` (lowercase).
 
+## Install
+
+```bash
+# macOS (Homebrew)
+brew install runpod/runpodctl/runpodctl
+
+# Linux / macOS (manual)
+curl -sL https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-linux-amd64.tar.gz | tar xz -C ~/.local/bin
+# Replace "linux-amd64" with: darwin-arm64 (Apple Silicon), darwin-amd64 (Intel Mac)
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri https://github.com/runpod/runpodctl/releases/latest/download/runpodctl-windows-amd64.zip -OutFile runpodctl.zip; Expand-Archive runpodctl.zip -DestinationPath $env:LOCALAPPDATA\runpodctl; $env:PATH += ";$env:LOCALAPPDATA\runpodctl"
+```
+
 ## Quick start
 
 ```bash
