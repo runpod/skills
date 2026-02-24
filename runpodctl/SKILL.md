@@ -49,7 +49,7 @@ runpodctl pod update <pod-id> --name "new"            # Update pod
 runpodctl pod delete <pod-id>                         # Delete pod
 ```
 
-**List flags:** `--all` / `-a`, `--status`, `--since`, `--created-after`, `--gpu-id`, `--compute-type`
+**List flags:** `--all` / `-a`, `--status`, `--since`, `--created-after`, `--name`, `--compute-type`
 
 **Create flags:** `--template-id` (required if no `--image`), `--image` (required if no `--template-id`), `--name`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--ssh` (default true), `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
 
