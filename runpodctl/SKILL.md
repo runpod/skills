@@ -5,7 +5,7 @@ allowed-tools: Bash(runpodctl:*)
 compatibility: Linux, macOS
 metadata:
   author: runpod
-  version: "2.0"
+  version: "2.1"
 license: Apache-2.0
 ---
 
@@ -18,6 +18,9 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 ## Install
 
 ```bash
+# Any platform (official installer)
+curl -sSL https://cli.runpod.net | bash
+
 # macOS (Homebrew)
 brew install runpod/runpodctl/runpodctl
 
@@ -64,10 +67,11 @@ runpodctl pod stop <pod-id>                           # Stop running pod
 runpodctl pod restart <pod-id>                        # Restart pod
 runpodctl pod reset <pod-id>                          # Reset pod
 runpodctl pod update <pod-id> --name "new"            # Update pod
-runpodctl pod delete <pod-id>                         # Delete pod
+runpodctl pod delete <pod-id>                         # Delete pod (aliases: rm, remove)
 ```
 
 **List flags:** `--all` / `-a`, `--status`, `--since`, `--created-after`, `--name`, `--compute-type`
+**Get flags:** `--include-machine`, `--include-network-volume`
 
 **Create flags:** `--template-id` (required if no `--image`), `--image` (required if no `--template-id`), `--name`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--ssh` (default true), `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
 
@@ -81,6 +85,8 @@ runpodctl serverless update <endpoint-id> --workers-max 5       # Update endpoin
 runpodctl serverless delete <endpoint-id>             # Delete endpoint
 ```
 
+**List flags:** `--include-template`, `--include-workers`
+**Update flags:** `--name`, `--workers-min`, `--workers-max`, `--idle-timeout`, `--scaler-type` (QUEUE_DELAY or REQUEST_COUNT), `--scaler-value`
 **Create flags:** `--name`, `--template-id`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--data-center-ids`
 
 ### Templates (alias: tpl)
