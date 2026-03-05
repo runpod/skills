@@ -1,493 +1,255 @@
 ---
 name: flash
-description: Complete knowledge of the runpod-flash framework - SDK, CLI, architecture, deployment, and codebase. Use when working with runpod-flash code, writing @remote functions, configuring resources, debugging deployments, or understanding the framework internals. Triggers on "flash", "runpod-flash", "@remote", "serverless", "deploy", "LiveServerless", "LoadBalancer", "GpuGroup".
+description: runpod-flash SDK and CLI for deploying AI workloads on Runpod serverless GPUs/CPUs.
 user-invocable: true
-allowed-tools: Read, Grep, Glob, Bash
 ---
 
 # Runpod Flash
 
-**runpod-flash** (v1.0.0) is a Python SDK for distributed execution of AI workloads on RunPod's serverless infrastructure. Write Python functions locally, decorate with `@remote`, and Flash handles GPU/CPU provisioning, dependency management, and data transfer.
+Write code locally, test with `flash run` (dev server at localhost:8888), and flash automatically provisions and deploys to remote GPUs/CPUs in the cloud. `Endpoint` handles everything.
 
-- **Package**: `pip install runpod-flash`
-- **Import**: `from runpod_flash import remote, LiveServerless, GpuGroup, ...`
-- **CLI**: `flash`
-- **Python**: >=3.10, <3.15
-
-## Getting Started
-
-### 1. Install Flash
+## Setup
 
 ```bash
-pip install runpod-flash
+pip install runpod-flash                 # requires Python >=3.10
+
+# auth option 1: browser-based login (saves token locally)
+flash login
+
+# auth option 2: API key via environment variable
+export RUNPOD_API_KEY=your_key
+
+flash init my-project                    # scaffold a new project in ./my-project
 ```
 
-### 2. Set your RunPod API key
-
-Get a key from [RunPod account settings](https://docs.runpod.io/get-started/api-keys), then either export it:
+## CLI
 
 ```bash
-export RUNPOD_API_KEY=your_api_key_here
+flash run                                # start local dev server at localhost:8888
+flash run --auto-provision               # same, but pre-provision endpoints (no cold start)
+flash build                              # package artifact for deployment (500MB limit)
+flash build --exclude pkg1,pkg2          # exclude packages from build
+flash deploy new staging                 # deploy to "staging" environment
+flash deploy send staging                # send latest build to "staging"
+flash deploy list staging                # list deployments in "staging"
+flash deploy info staging                # show deployment details
+flash deploy delete staging              # delete "staging" deployment
+flash undeploy list                      # list all active endpoints
+flash undeploy my-endpoint               # remove a specific endpoint
 ```
 
-Or save in a `.env` file in your project directory (Flash auto-loads via `python-dotenv`):
+## Endpoint: Three Modes
 
-```bash
-echo "RUNPOD_API_KEY=your_api_key_here" > .env
-```
+### Mode 1: Your Code (Queue-Based Decorator)
 
-### 3. Write and run a remote function
+One function = one endpoint with its own workers.
 
 ```python
-import asyncio
-from runpod_flash import remote, LiveServerless
+from runpod_flash import Endpoint, GpuGroup
 
-gpu_config = LiveServerless(name="my-first-worker")
+@Endpoint(name="my-worker", gpu=GpuGroup.AMPERE_80, workers=5, dependencies=["torch"])
+async def compute(data):
+    import torch  # MUST import inside function (cloudpickle)
+    return {"sum": torch.tensor(data, device="cuda").sum().item()}
 
-@remote(resource_config=gpu_config, dependencies=["torch"])
-async def gpu_task(data):
+result = await compute([1, 2, 3])
+```
+
+### Mode 2: Your Code (Load-Balanced Routes)
+
+Multiple HTTP routes share one pool of workers.
+
+```python
+from runpod_flash import Endpoint, GpuGroup
+
+api = Endpoint(name="my-api", gpu=GpuGroup.ADA_24, workers=(1, 5), dependencies=["torch"])
+
+@api.post("/predict")
+async def predict(data: list[float]):
     import torch
-    tensor = torch.tensor(data, device="cuda")
-    return {"sum": tensor.sum().item(), "gpu": torch.cuda.get_device_name(0)}
+    return {"result": torch.tensor(data, device="cuda").sum().item()}
 
-async def main():
-    result = await gpu_task([1, 2, 3, 4, 5])
-    print(result)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+@api.get("/health")
+async def health():
+    return {"status": "ok"}
 ```
 
-First run takes ~1 minute (endpoint provisioning). Subsequent runs take ~1 second.
+### Mode 3: External Image (Client)
 
-### 4. Or create a Flash API project
-
-```bash
-flash init my_project
-cd my_project
-pip install -r requirements.txt
-# Edit .env and add your RUNPOD_API_KEY
-flash run                    # Start local FastAPI server at localhost:8888
-flash run --auto-provision   # Pre-deploy all endpoints (faster testing)
-```
-
-API explorer available at `http://localhost:8888/docs`.
-
-### 5. Build and deploy to production
-
-```bash
-flash build                              # Scan @remote functions, package artifact
-flash build --exclude torch,torchvision  # Exclude packages in base image (500MB limit)
-flash deploy new production              # Create deployment environment
-flash deploy send production             # Upload and deploy
-flash deploy list                        # List environments
-flash deploy info production             # Show details
-flash deploy delete production           # Tear down
-```
-
-## Core Concept: The @remote Decorator
-
-The `@remote` decorator marks functions for remote execution on RunPod infrastructure. Code inside runs remotely; code outside runs locally.
+Deploy a pre-built Docker image and call it via HTTP.
 
 ```python
-from runpod_flash import remote, LiveServerless
+from runpod_flash import Endpoint, GpuGroup, PodTemplate
 
-config = LiveServerless(name="my-worker")
-
-@remote(resource_config=config, dependencies=["torch", "numpy"])
-async def gpu_compute(data):
-    import torch  # MUST import inside function
-    tensor = torch.tensor(data, device="cuda")
-    return {"result": tensor.sum().item()}
-
-result = await gpu_compute([1, 2, 3])
-```
-
-### @remote Signature
-
-```python
-def remote(
-    resource_config: ServerlessResource,  # Required: GPU/CPU config
-    dependencies: list[str] = None,       # pip packages
-    system_dependencies: list[str] = None,# apt-get packages
-    accelerate_downloads: bool = True,    # CDN acceleration
-    local: bool = False,                  # Execute locally (testing)
-    method: str = None,                   # HTTP method (LoadBalancer only)
-    path: str = None,                     # HTTP path (LoadBalancer only)
-)
-```
-
-### CRITICAL: Cloudpickle Scoping Rules
-
-Functions decorated with `@remote` are serialized with cloudpickle. They can ONLY access:
-- Function parameters
-- Local variables defined inside the function
-- Imports done inside the function
-- Built-in Python functions
-
-They CANNOT access: module-level imports, global variables, external functions/classes.
-
-```python
-# WRONG - external references
-import torch
-@remote(resource_config=config)
-async def bad(data):
-    return torch.tensor(data)  # torch not accessible
-
-# CORRECT - everything inside
-@remote(resource_config=config, dependencies=["torch"])
-async def good(data):
-    import torch
-    return torch.tensor(data)
-```
-
-### Return Behavior
-
-- Decorated function is always awaitable (`await my_func(...)`)
-- Queue-based resources return `JobOutput` with `.output`, `.error`, `.status`
-- Load-balanced resources return your dict directly
-
-## Resource Configuration Classes
-
-Choose based on execution model and environment:
-
-| Class | Queue | HTTP | Environment | Use Case |
-|-------|-------|------|-------------|----------|
-| `LiveServerless` | Yes | No | Dev | GPU with retries, remote code exec |
-| `CpuLiveServerless` | Yes | No | Dev | CPU with retries, remote code exec |
-| `ServerlessEndpoint` | Yes | No | Prod | GPU, custom Docker images |
-| `CpuServerlessEndpoint` | Yes | No | Prod | CPU, custom Docker images |
-| `LiveLoadBalancer` | No | Yes | Dev | GPU low-latency HTTP APIs |
-| `CpuLiveLoadBalancer` | No | Yes | Dev | CPU low-latency HTTP APIs |
-| `LoadBalancerSlsResource` | No | Yes | Prod | GPU production HTTP |
-| `CpuLoadBalancerSlsResource` | No | Yes | Prod | CPU production HTTP |
-
-**Queue-based**: Best for batch, long-running tasks, automatic retries.
-**Load-balanced**: Best for real-time APIs, low-latency, direct HTTP routing.
-
-**Live\* classes**: Fixed optimized Docker image, full remote code execution.
-**Non-Live classes**: Custom Docker images, dictionary payload only.
-
-### Common Parameters
-
-```python
-LiveServerless(
-    name="worker-name",              # Required, unique
-    gpus=[GpuGroup.AMPERE_80],       # GPU type(s)
-    workersMin=0,                     # Min workers
-    workersMax=3,                     # Max workers
-    idleTimeout=300,                  # Seconds before scale-down
-    networkVolumeId="vol_abc123",     # Persistent storage
-    env={"KEY": "value"},             # Environment variables
+server = Endpoint(
+    name="my-server",
+    image="my-org/my-image:latest",
+    gpu=GpuGroup.AMPERE_80,
+    workers=1,
+    env={"HF_TOKEN": "xxx"},
     template=PodTemplate(containerDiskInGb=100),
 )
+
+# LB-style
+result = await server.post("/v1/completions", {"prompt": "hello"})
+models = await server.get("/v1/models")
+
+# QB-style
+job = await server.run({"prompt": "hello"})
+await job.wait()
+print(job.output)
 ```
 
-### GPU Groups (GpuGroup enum)
-
-- `GpuGroup.ANY` - Any available (not for production)
-- `GpuGroup.AMPERE_16` - RTX A4000, 16GB
-- `GpuGroup.AMPERE_24` - RTX A5000, 24GB
-- `GpuGroup.AMPERE_48` - A40/RTX A6000, 48GB
-- `GpuGroup.AMPERE_80` - A100, 80GB
-- `GpuGroup.ADA_24` - RTX 4090, 24GB
-- `GpuGroup.ADA_32_PRO` - RTX 5090, 32GB
-- `GpuGroup.ADA_48_PRO` - RTX 6000 Ada, 48GB
-- `GpuGroup.ADA_80_PRO` - H100, 80GB
-- `GpuGroup.HOPPER_141` - H200, 141GB
-
-### CPU Instance Types (CpuInstanceType enum)
-
-Format: `CPU{generation}{type}_{vcpu}_{memory_gb}`
-
-| Instance Type | Gen | Type | vCPU | RAM |
-|--------------|-----|------|------|-----|
-| `CPU3G_1_4` | 3rd | General | 1 | 4GB |
-| `CPU3G_2_8` | 3rd | General | 2 | 8GB |
-| `CPU3G_4_16` | 3rd | General | 4 | 16GB |
-| `CPU3G_8_32` | 3rd | General | 8 | 32GB |
-| `CPU3C_1_2` | 3rd | Compute | 1 | 2GB |
-| `CPU3C_2_4` | 3rd | Compute | 2 | 4GB |
-| `CPU3C_4_8` | 3rd | Compute | 4 | 8GB |
-| `CPU3C_8_16` | 3rd | Compute | 8 | 16GB |
-| `CPU5C_1_2` | 5th | Compute | 1 | 2GB |
-| `CPU5C_2_4` | 5th | Compute | 2 | 4GB |
-| `CPU5C_4_8` | 5th | Compute | 4 | 8GB |
-| `CPU5C_8_16` | 5th | Compute | 8 | 16GB |
-
-Use with `instanceIds` parameter:
+Connect to an existing endpoint by ID (no provisioning):
 
 ```python
-config = LiveServerless(
-    name="cpu-worker",
-    instanceIds=[CpuInstanceType.CPU5C_4_8],
-    workersMax=5,
+ep = Endpoint(id="abc123")
+job = await ep.runsync({"input": "hello"})
+print(job.output)
+```
+
+## How Mode Is Determined
+
+| Parameters | Mode |
+|-----------|------|
+| `name=` only | Decorator (your code) |
+| `image=` set | Client (deploys image, then HTTP calls) |
+| `id=` set | Client (connects to existing, no provisioning) |
+
+## Endpoint Constructor
+
+```python
+Endpoint(
+    name="endpoint-name",                  # required (unless id= set)
+    id=None,                               # connect to existing endpoint
+    gpu=GpuGroup.AMPERE_80,               # single GPU type (default: ANY)
+    gpu=[GpuGroup.ADA_24, GpuGroup.AMPERE_80],  # or list for auto-select by supply
+    cpu=CpuInstanceType.CPU5C_4_8,        # CPU type (mutually exclusive with gpu)
+    workers=5,                             # shorthand for (0, 5)
+    workers=(1, 5),                        # explicit (min, max)
+    idle_timeout=60,                       # seconds before scale-down (default: 60)
+    dependencies=["torch"],                # pip packages for remote exec
+    system_dependencies=["ffmpeg"],        # apt-get packages
+    image="org/image:tag",                 # pre-built Docker image (client mode)
+    env={"KEY": "val"},                    # environment variables
+    volume=NetworkVolume(...),             # persistent storage
+    gpu_count=1,                           # GPUs per worker
+    template=PodTemplate(containerDiskInGb=100),
+    flashboot=True,                        # fast cold starts
 )
 ```
 
-Or use explicit CPU classes:
-
-```python
-from runpod_flash import CpuLiveServerless
-config = CpuLiveServerless(name="cpu-worker", workersMax=5)
-```
-
-### PodTemplate
-
-Override pod-level settings:
-
-```python
-from runpod_flash import PodTemplate
-
-template = PodTemplate(
-    containerDiskInGb=100,
-    env=[{"key": "PYTHONPATH", "value": "/workspace"}],
-)
-
-config = LiveServerless(name="worker", template=template)
-```
+- `gpu=` and `cpu=` are mutually exclusive
+- `workers=5` means `(0, 5)`. Default is `(0, 1)`
+- `idle_timeout` default is **60 seconds**
+- `flashboot=True` (default) -- enables fast cold starts via snapshot restore
+- `gpu_count` -- GPUs per worker (default 1), use >1 for multi-GPU models
 
 ### NetworkVolume
 
 ```python
-from runpod_flash import NetworkVolume, DataCenter
+NetworkVolume(name="my-vol", size=100)  # size in GB, default 100
+```
 
-volume = NetworkVolume(
-    name="model-storage",
-    size=100,  # GB
-    dataCenterId=DataCenter.EU_RO_1,
+### PodTemplate
+
+```python
+PodTemplate(
+    containerDiskInGb=64,    # container disk size (default 64)
+    dockerArgs="",           # extra docker arguments
+    ports="",                # exposed ports
+    startScript="",          # script to run on start
 )
 ```
 
-### LoadBalancer Resources
+## EndpointJob
 
-When using `LoadBalancerSlsResource` or `LiveLoadBalancer`:
-- `method` and `path` are **required** on `@remote`
-- `path` must start with "/"
-- `method` must be one of: GET, POST, PUT, DELETE, PATCH
+Returned by `ep.run()` and `ep.runsync()` in client mode.
 
 ```python
-from runpod_flash import remote, LiveLoadBalancer
-
-api = LiveLoadBalancer(name="api-service")
-
-@remote(api, method="POST", path="/api/process")
-async def process(x: int, y: int):
-    return {"result": x + y}
-
-@remote(api, method="GET", path="/api/health")
-def health():
-    return {"status": "ok"}
+job = await ep.run({"data": [1, 2, 3]})
+await job.wait(timeout=120)        # poll until done
+print(job.id, job.output, job.error, job.done)
+await job.cancel()
 ```
 
-Key differences from queue-based:
-- Direct HTTP routing (no queue), lower latency
-- Returns dict directly (no JobOutput wrapper)
-- No automatic retries
+## GPU Types (GpuGroup)
 
-## Error Handling
+| Enum | GPU | VRAM |
+|------|-----|------|
+| `ANY` | any | varies |
+| `AMPERE_16` | RTX A4000 | 16GB |
+| `AMPERE_24` | RTX A5000/L4 | 24GB |
+| `AMPERE_48` | A40/A6000 | 48GB |
+| `AMPERE_80` | A100 | 80GB |
+| `ADA_24` | RTX 4090 | 24GB |
+| `ADA_32_PRO` | RTX 5090 | 32GB |
+| `ADA_48_PRO` | RTX 6000 Ada | 48GB |
+| `ADA_80_PRO` | H100 | 80GB |
+| `HOPPER_141` | H200 | 141GB |
 
-### Queue-Based Resources
+## CPU Types (CpuInstanceType)
+
+| Enum | vCPU | RAM | Max Disk | Type |
+|------|------|-----|----------|------|
+| `CPU3G_1_4` | 1 | 4GB | 10GB | General |
+| `CPU3G_2_8` | 2 | 8GB | 20GB | General |
+| `CPU3G_4_16` | 4 | 16GB | 40GB | General |
+| `CPU3G_8_32` | 8 | 32GB | 80GB | General |
+| `CPU3C_1_2` | 1 | 2GB | 10GB | Compute |
+| `CPU3C_2_4` | 2 | 4GB | 20GB | Compute |
+| `CPU3C_4_8` | 4 | 8GB | 40GB | Compute |
+| `CPU3C_8_16` | 8 | 16GB | 80GB | Compute |
+| `CPU5C_1_2` | 1 | 2GB | 15GB | Compute (5th gen) |
+| `CPU5C_2_4` | 2 | 4GB | 30GB | Compute (5th gen) |
+| `CPU5C_4_8` | 4 | 8GB | 60GB | Compute (5th gen) |
+| `CPU5C_8_16` | 8 | 16GB | 120GB | Compute (5th gen) |
 
 ```python
-job_output = await my_function(data)
-if job_output.error:
-    print(f"Failed: {job_output.error}")
-else:
-    result = job_output.output
-```
+from runpod_flash import Endpoint, CpuInstanceType
 
-`JobOutput` fields: `id`, `status`, `output`, `error`, `started_at`, `ended_at`
-
-### Load-Balanced Resources
-
-```python
-try:
-    result = await my_function(data)  # Returns dict directly
-except Exception as e:
-    print(f"Error: {e}")
-```
-
-### Runtime Exceptions
-
-```
-FlashRuntimeError (base)
-  RemoteExecutionError      # Remote function failed
-  SerializationError        # cloudpickle serialization failed
-  GraphQLError              # GraphQL base error
-    GraphQLMutationError    # Mutation failed
-    GraphQLQueryError       # Query failed
-  ManifestError             # Invalid/missing manifest
-  ManifestServiceUnavailableError  # State Manager unreachable
+@Endpoint(name="cpu-work", cpu=CpuInstanceType.CPU5C_4_8, workers=5, dependencies=["pandas"])
+async def process(data):
+    import pandas as pd
+    return pd.DataFrame(data).describe().to_dict()
 ```
 
 ## Common Patterns
 
-### Hybrid GPU/CPU Pipeline
+### CPU + GPU Pipeline
 
 ```python
-from runpod_flash import remote, LiveServerless, CpuInstanceType
+from runpod_flash import Endpoint, GpuGroup, CpuInstanceType
 
-cpu_config = LiveServerless(name="preprocessor", instanceIds=[CpuInstanceType.CPU5C_4_8])
-gpu_config = LiveServerless(name="inference", gpus=[GpuGroup.AMPERE_80])
-
-@remote(resource_config=cpu_config, dependencies=["pandas"])
-async def preprocess(data):
+@Endpoint(name="preprocess", cpu=CpuInstanceType.CPU5C_4_8, workers=5, dependencies=["pandas"])
+async def preprocess(raw):
     import pandas as pd
-    return pd.DataFrame(data).to_dict('records')
+    return pd.DataFrame(raw).to_dict("records")
 
-@remote(resource_config=gpu_config, dependencies=["torch"])
-async def inference(data):
+@Endpoint(name="infer", gpu=GpuGroup.AMPERE_80, workers=5, dependencies=["torch"])
+async def infer(clean):
     import torch
-    tensor = torch.tensor(data, device="cuda")
-    return {"result": tensor.sum().item()}
+    t = torch.tensor([[v for v in r.values()] for r in clean], device="cuda")
+    return {"predictions": t.mean(dim=1).tolist()}
 
-async def pipeline(raw_data):
-    clean = await preprocess(raw_data)
-    return await inference(clean)
+async def pipeline(data):
+    return await infer(await preprocess(data))
 ```
 
 ### Parallel Execution
 
 ```python
-results = await asyncio.gather(
-    process_item(item1),
-    process_item(item2),
-    process_item(item3),
-)
+import asyncio
+results = await asyncio.gather(compute(a), compute(b), compute(c))
 ```
 
-### Local Testing
+## Gotchas
 
-```python
-@remote(resource_config=config, local=True)
-async def my_function(data):
-    return {"status": "ok"}  # Runs locally, skips remote
-```
-
-### Cost Optimization
-
-- Use `workersMin=0` to scale from zero
-- Use `idleTimeout=600` to reduce churn
-- Use smaller GPUs if they fit your model
-- Use `Live*` classes for spot pricing in dev
-- Pass URLs/paths instead of large data objects
-
-## CLI Commands
-
-### flash init
-
-```bash
-flash init [project_name]
-```
-
-Creates a project template:
-
-```
-project_name/
-├── main.py                # FastAPI entry point
-├── workers/
-│   ├── gpu/__init__.py    # GPU router
-│   │   └── endpoint.py    # GPU @remote function
-│   └── cpu/__init__.py    # CPU router
-│       └── endpoint.py    # CPU @remote function
-├── .env                   # API key template
-├── .gitignore
-├── .flashignore           # Deployment ignore patterns
-├── requirements.txt
-└── README.md
-```
-
-### flash run
-
-```bash
-flash run [--auto-provision] [--host HOST] [--port PORT]
-```
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--auto-provision` | off | Pre-deploy all endpoints before serving |
-| `--host` | `localhost` | Server host (or `FLASH_HOST` env) |
-| `--port` | `8888` | Server port (or `FLASH_PORT` env) |
-
-### flash build
-
-```bash
-flash build [--exclude PACKAGES] [--keep-build] [--preview]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--exclude pkg1,pkg2` | Skip packages already in base Docker image |
-| `--keep-build` | Don't delete `.flash/.build/` after packaging |
-| `--preview` | Build then run in local Docker containers |
-
-Build steps: scan `@remote` decorators, group by resource config, create `flash_manifest.json`, install dependencies for Linux x86_64, package into `.flash/artifact.tar.gz`.
-
-**500MB deployment limit** - use `--exclude` for packages in base image:
-
-```bash
-flash build --exclude torch,torchvision,torchaudio
-```
-
-**`--preview` mode**: Creates Docker containers per resource config, starts mothership on `localhost:8000`, enables end-to-end local testing.
-
-### flash deploy
-
-```bash
-flash deploy new <env_name> [--app-name NAME]   # Create environment
-flash deploy send <env_name> [--app-name NAME]   # Deploy archive
-flash deploy list [--app-name NAME]               # List environments
-flash deploy info <env_name> [--app-name NAME]    # Show details
-flash deploy delete <env_name> [--app-name NAME]  # Delete (double confirmation)
-```
-
-`flash deploy send` requires `flash build` to have been run first.
-
-### flash undeploy
-
-```bash
-flash undeploy list          # List all deployed resources
-flash undeploy <name>        # Undeploy specific resource
-```
-
-### flash env / flash app
-
-```bash
-flash env list|create|info|delete <name>   # Environment management
-flash app list|get <name>                  # App management
-```
-
-## Architecture Overview
-
-### Deployment Architecture
-
-**Mothership Pattern**: Coordinator endpoint + distributed child endpoints.
-
-1. `flash build` scans code, creates manifest + archive
-2. `flash deploy send` uploads archive, provisions resources
-3. Mothership boots, reconciles desired vs current state
-4. Child endpoints query State Manager GraphQL for service discovery (peer-to-peer)
-5. Functions route locally or remotely based on manifest
-
-### Cross-Endpoint Routing
-
-Functions on different endpoints can call each other transparently:
-1. `ProductionWrapper` intercepts calls
-2. `ServiceRegistry` looks up function in manifest
-3. Local function? Execute directly
-4. Remote function? Serialize args (cloudpickle), POST to remote endpoint
-
-**Serialization**: cloudpickle + base64, max 10MB payload.
-
-## Common Gotchas
-
-1. **External scope in @remote functions** - Most common error. Everything must be inside.
-2. **Forgetting `await`** - All remote functions must be awaited.
-3. **Undeclared dependencies** - Must be in `dependencies=[]` parameter.
-4. **Queue vs LB confusion** - Queue returns `JobOutput`, LB returns dict directly.
-5. **Large serialization** - Pass URLs/paths, not large data objects.
-6. **Imports at module level** - Import inside `@remote` functions, not at top of file.
-7. **LoadBalancer requires method+path** - `@remote(config, method="POST", path="/api/x")`
-8. **Bundle too large (>500MB)** - Use `--exclude` for packages in base Docker image.
-9. **Endpoints accumulate** - Clean up with `flash undeploy list` / `flash undeploy <name>`.
+1. **Imports outside function** -- most common error. Everything inside the decorated function.
+2. **Forgetting await** -- all decorated functions and client methods need `await`.
+3. **Missing dependencies** -- must list in `dependencies=[]`.
+4. **gpu/cpu are exclusive** -- pick one per Endpoint.
+5. **idle_timeout is seconds** -- default 60s, not minutes.
+6. **10MB payload limit** -- pass URLs, not large objects.
+7. **Client vs decorator** -- `image=`/`id=` = client. Otherwise = decorator.
+8. **Auto GPU switching requires workers >= 5** -- pass a list of GPU types (e.g. `gpu=[GpuGroup.ADA_24, GpuGroup.AMPERE_80]`) and set `workers=5` or higher. The platform only auto-switches GPU types based on supply when max workers is at least 5.
