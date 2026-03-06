@@ -1,0 +1,9 @@
+{
+  "name": "runpodctl",
+  "description": "Manage GPU pods, serverless endpoints, templates, volumes, and models",
+  "version": "2.1.0",
+  "author": {
+    "name": "Runpod"
+  },
+  "license": "Apache-2.0"
+}

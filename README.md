@@ -14,6 +14,18 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 
 ## Installation
 
+### Claude Code (plugin marketplace)
+
+```bash
+/plugin marketplace add runpod/skills
+/plugin install runpodctl@runpod-skills
+/plugin install flash@runpod-skills
+```
+
+Claude Code can automatically update plugins at startup. Run `/plugin` → Marketplaces → Enable auto-update.
+
+### Other AI Agents
+
 ```bash
 npx skills add runpod/skills
 ```
@@ -60,10 +72,20 @@ https://api.runpod.ai/v2/<endpoint-id>/status/<job-id>  # Job status
 ## Structure
 
 ```
+.claude-plugin/
+└── marketplace.json
 flash/
-└── SKILL.md
+├── .claude-plugin/
+│   └── plugin.json
+└── skills/
+    └── flash/
+        └── SKILL.md
 runpodctl/
-└── SKILL.md
+├── .claude-plugin/
+│   └── plugin.json
+└── skills/
+    └── runpodctl/
+        └── SKILL.md
 ```
 
 ## License

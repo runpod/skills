@@ -1,0 +1,9 @@
+{
+  "name": "flash",
+  "description": "runpod-flash SDK and CLI for deploying AI workloads on Runpod serverless GPUs/CPUs",
+  "version": "1.0.0",
+  "author": {
+    "name": "Runpod"
+  },
+  "license": "Apache-2.0"
+}
