@@ -1,0 +1,24 @@
+{
+  "name": "runpod-skills",
+  "owner": {
+    "name": "Runpod",
+    "email": "hello@runpod.io"
+  },
+  "metadata": {
+    "description": "Skills for AI agents to manage GPU workloads on Runpod"
+  },
+  "plugins": [
+    {
+      "name": "flash",
+      "description": "runpod-flash SDK and CLI for deploying AI workloads on Runpod serverless GPUs/CPUs",
+      "source": "./flash",
+      "category": "Runpod"
+    },
+    {
+      "name": "runpodctl",
+      "description": "Manage GPU pods, serverless endpoints, templates, volumes, and models",
+      "source": "./runpodctl",
+      "category": "Runpod"
+    }
+  ]
+}
