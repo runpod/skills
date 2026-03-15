@@ -17,6 +17,17 @@ Manage GPU pods, serverless endpoints, templates, volumes, and models.
 
 ## Install
 
+Before installing, check if runpodctl is already available:
+
+```bash
+# Check PATH first, then common install locations
+which runpodctl 2>/dev/null || ls ~/.local/bin/runpodctl 2>/dev/null || ls ~/bin/runpodctl 2>/dev/null
+```
+
+If found outside PATH, add it: `export PATH="$HOME/.local/bin:$HOME/bin:$PATH"`
+
+If not installed:
+
 ```bash
 # Any platform (official installer)
 curl -sSL https://cli.runpod.net | bash
