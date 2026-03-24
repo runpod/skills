@@ -42,7 +42,7 @@ Ensure `~/.local/bin` is on your `PATH` (add `export PATH="$HOME/.local/bin:$PAT
 runpodctl doctor                    # First time setup (API key + SSH)
 runpodctl gpu list                  # See available GPUs
 runpodctl template search pytorch   # Find a template
-runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA RTX 4090"  # Create from template
+runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA GeForce RTX 4090"  # Create from template
 runpodctl pod list                  # List your pods
 ```
 
@@ -59,8 +59,8 @@ runpodctl pod list --status exited                    # Filter by status (RUNNIN
 runpodctl pod list --since 24h                        # Pods created within last 24 hours
 runpodctl pod list --created-after 2025-01-15         # Pods created after date
 runpodctl pod get <pod-id>                            # Get pod details (includes SSH info)
-runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA RTX 4090"  # Create from template
-runpodctl pod create --image "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04" --gpu-id "NVIDIA RTX 4090"  # Create with image
+runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA GeForce RTX 4090"  # Create from template
+runpodctl pod create --image "runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404" --gpu-id "NVIDIA GeForce RTX 4090"  # Create with image
 runpodctl pod create --compute-type cpu --image ubuntu:22.04  # Create CPU pod
 runpodctl pod start <pod-id>                          # Start stopped pod
 runpodctl pod stop <pod-id>                           # Stop running pod
@@ -178,8 +178,7 @@ runpodctl receive <code>                              # Receive files using code
 runpodctl doctor                                      # Diagnose and fix CLI issues
 runpodctl update                                      # Update CLI
 runpodctl version                                     # Show version
-runpodctl completion bash >> ~/.bashrc                # Install bash completion
-runpodctl completion zsh >> ~/.zshrc                  # Install zsh completion
+runpodctl completion                                  # Auto-detect shell and install completion
 ```
 
 ## URLs
