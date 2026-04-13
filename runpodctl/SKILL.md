@@ -167,9 +167,80 @@ runpodctl ssh add-key                                 # Add SSH key
 
 ### File Transfer
 
-```bash
-runpodctl send <path>                                 # Send files (outputs code)
-runpodctl receive <code>                              # Receive files using code
+**Agent instructions (send/receive files or directories):**
+
+1. **Sender (local or remote):** Start the sending side **without** `--code`:
+
+   ```bash
+   runpodctl send [path to file or directory]
+   ```
+
+   **Session key:** Read stdout and treat the **first line** as the secret code for this transfer only. Ignore subsequent lines unless you need logs. Do not invent or reuse a code; each `send` run produces a fresh key on that first line. After printing the code, `send` typically blocks until the receiver connects—capture the first line promptly (for example run `send` where stdout can be read as it arrives, or tee to a log), then start `receive` on the other side with that exact string.
+
+2. **Receiver (local or remote):** Pass that same secret as the first positional argument (there is no `--code` flag on `receive`):
+
+   ```bash
+   runpodctl receive [secret from send's first line of stdout]
+   ```
+
+   On whichever machine is not running the command directly, use `runpodctl ssh` (into the pod or host) to start the matching end there—one side runs `send`, the other runs `receive`, both using the identical secret from step 1.
+
+3. **Completion:** Wait until both processes exit with status code `0`. If either exits non-zero, diagnose and retry by running **`send` again** and using the **new** first line of output as the secret (do not reuse the previous transfer's code).
+
+4. **Do not pre-process paths:** `runpodctl` handles incremental transfer (changed files), encryption, and compression. Do not compress, encrypt, or otherwise alter the source tree before sending.
+
+Example script you can reference. You can make changes as needed. 
+```
+  #!/usr/bin/env bash
+  # Upload a file or directory to a Runpod pod.
+  # Usage: upload.sh <pod-id> <local-path>
+
+  set -euo pipefail
+
+  POD_ID="${1:?Usage: $0 <pod-id> <local-path>}"
+  SEND_PATH="${2:?Usage: $0 <pod-id> <local-path>}"
+
+  # 1. Get SSH connection details
+  SSH_INFO=$(runpodctl ssh info "$POD_ID")
+  SSH_HOST=$(echo "$SSH_INFO" | awk -F'"' '/"ip"/{print $4}')
+  SSH_PORT=$(echo "$SSH_INFO" | awk '/"port"/{gsub(/[^0-9]/,"",$0); print}')
+  SSH_KEY=$(echo "$SSH_INFO"  | awk -F'"' '/"path"/{print $4; exit}')
+
+  # 2. Start sender in background; capture output to extract nonce from first line
+  TMPLOG=$(mktemp)
+  runpodctl send "$SEND_PATH" >"$TMPLOG" 2>&1 &
+  SEND_PID=$!
+
+  # 3. Wait for the nonce (first line of sender output)
+  NONCE=""
+  for i in $(seq 1 15); do
+    sleep 1
+    NONCE=$(head -1 "$TMPLOG" 2>/dev/null)
+    [ -n "$NONCE" ] && break
+  done
+
+  if [ -z "$NONCE" ]; then
+    echo "ERROR: timed out waiting for nonce" >&2
+    kill $SEND_PID 2>/dev/null; rm -f "$TMPLOG"; exit 1
+  fi
+
+  echo "Nonce: $NONCE"
+
+  # 4. Run receiver on the pod
+  ssh -i "$SSH_KEY" "root@$SSH_HOST" -p "$SSH_PORT" -o StrictHostKeyChecking=no \
+    "runpodctl receive $NONCE"
+  RECV_EXIT=$?
+
+  # 5. Wait for sender to finish
+  wait $SEND_PID; SEND_EXIT=$?
+  rm -f "$TMPLOG"
+
+  if [ "$SEND_EXIT" -ne 0 ] || [ "$RECV_EXIT" -ne 0 ]; then
+    echo "ERROR: transfer failed (send=$SEND_EXIT, recv=$RECV_EXIT)" >&2
+    exit 1
+  fi
+
+  echo "Transfer complete."
 ```
 
 ### Utilities
