@@ -34,7 +34,7 @@ The HuggingFace CLI (`hf`) is used to download models from the Hub to your local
 curl -LsSf https://hf.co/cli/install.sh | bash
 
 # macOS (Homebrew)
-brew install huggingface
+brew install hf
 
 # Windows: use the Linux standalone installer above inside your WSL2 terminal
 ```
