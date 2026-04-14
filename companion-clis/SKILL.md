@@ -25,7 +25,7 @@ This installs WSL2 with Ubuntu by default. After restarting, open the Ubuntu app
 
 ## HuggingFace CLI
 
-The HuggingFace CLI (`hf`) is used to download models from the Hub to your local machine so they are cached and available when you build and run the Docker container. For example, to deploy `meta-llama/Llama-3.1-8B` to a Runpod serverless endpoint: download the model locally first, build a Docker image that includes or mounts it, validate the container locally, then push the image to Docker Hub for Runpod to pull.
+The HuggingFace CLI (`hf`) is used to download models from the Hub to your local machine so they are cached and available when you build and run the Docker container. For example, to deploy `openai/gpt-oss-20b` to a Runpod serverless endpoint: download the model locally first, build a Docker image that includes or mounts it, validate the container locally, then push the image to Docker Hub for Runpod to pull.
 
 ### Install
 
@@ -65,11 +65,11 @@ hf auth logout      # delete all locally stored tokens
 
 ```bash
 # Download a model to a local directory (use --local-dir to control where it lands)
+hf download openai/gpt-oss-20b --local-dir ./models/gpt-oss-20b
 hf download meta-llama/Llama-3.1-8B --local-dir ./models/llama-3.1-8b
-hf download TinyLlama/TinyLlama-1.1B-Chat-v1.0 --local-dir ./models/tinyllama
 
 # Download a single file from a model repo
-hf download meta-llama/Llama-3.1-8B config.json --local-dir ./models/llama-3.1-8b
+hf download openai/gpt-oss-20b config.json --local-dir ./models/gpt-oss-20b
 
 # Download with glob filters (e.g. only safetensors weights, skip fp16 variants)
 hf download stabilityai/stable-diffusion-xl-base-1.0 \
@@ -77,7 +77,7 @@ hf download stabilityai/stable-diffusion-xl-base-1.0 \
   --local-dir ./models/sdxl
 
 # Download a specific revision (commit hash, branch, or tag — append --revision REF)
-hf download meta-llama/Llama-3.1-8B --revision v1.0 --local-dir ./models/llama-3.1-8b
+hf download openai/gpt-oss-20b --revision v1.0 --local-dir ./models/gpt-oss-20b
 ```
 
 ### Troubleshooting
