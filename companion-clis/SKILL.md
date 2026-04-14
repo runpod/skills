@@ -1,8 +1,8 @@
 ---
 name: companion-clis
 description: Companion CLIs for Runpod workflows — HuggingFace, GitHub, Docker, and AWS.
-allowed-tools: Bash(hf:*), Bash(gh:*), Bash(docker:*), Bash(aws:*)
-compatibility: Linux, macOS
+allowed-tools: Bash(hf:*), Bash(gh:*), Bash(docker:*), Bash(aws:*), Bash(ssh-keygen:*), Bash(ssh-add:*), Bash(ssh-agent:*)
+compatibility: Linux, macOS, Windows
 metadata:
   author: runpod
   version: "1.0"
@@ -13,9 +13,19 @@ license: Apache-2.0
 
 Four CLIs commonly needed alongside Runpod: HuggingFace (`hf`), GitHub (`gh`), Docker (`docker`), and AWS (`aws`). Each requires credentials before use.
 
+## Windows: Install WSL2 First
+
+If you are on Windows, install WSL2 (Windows Subsystem for Linux) before proceeding. WSL2 gives you a native Linux environment on Windows, which all these CLIs are designed for. Run in PowerShell as Administrator, then restart:
+
+```powershell
+wsl --install
+```
+
+This installs WSL2 with Ubuntu by default. After restarting, open the Ubuntu app to complete setup (create a Linux username and password). From that point on, follow the **Linux** instructions throughout this skill.
+
 ## HuggingFace CLI
 
-The HuggingFace CLI (`hf`) is used to download models into a local Docker container to test and validate the image before deploying to Runpod.
+The HuggingFace CLI (`hf`) is used to download models from the Hub to your local machine so they are cached and available when you build and run the Docker container. For example, to deploy `openai/gpt-oss-20b` to a Runpod serverless endpoint: download the model locally first, build a Docker image that includes or mounts it, validate the container locally, then push the image to Docker Hub for Runpod to pull.
 
 ### Install
 
@@ -29,8 +39,7 @@ brew install hf
 # Any platform (pip)
 pip install -U huggingface_hub
 
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://hf.co/cli/install.ps1 | iex"
+# Windows: use the Linux installer above inside your WSL2 terminal
 ```
 
 ### Credentials
@@ -56,32 +65,23 @@ hf auth logout      # delete all locally stored tokens
 ### Key Commands
 
 ```bash
-# Download an entire model repo (to HuggingFace cache)
-hf download meta-llama/Llama-3.1-8B
+# Download a model to a local directory (use --local-dir to control where it lands)
+hf download openai/gpt-oss-20b --local-dir ./models/gpt-oss-20b
+hf download meta-llama/Llama-3.1-8B --local-dir ./models/llama-3.1-8b
 
-# Download to a specific directory (e.g. a network volume mount point)
-hf download meta-llama/Llama-3.1-8B --local-dir /workspace/models/llama-3.1-8b
+# Download a single file from a model repo
+hf download openai/gpt-oss-20b config.json --local-dir ./models/gpt-oss-20b
 
-# Download a single file
-hf download meta-llama/Llama-3.1-8B config.json --local-dir /workspace/models/llama-3.1-8b
-
-# Download with glob filters (include/exclude)
-hf download stabilityai/stable-diffusion-xl-base-1.0 --include "*.safetensors" --exclude "*.fp16.*"
-
-# Download a dataset or Space
-hf download HuggingFaceH4/ultrachat_200k --repo-type dataset
-hf download HuggingFaceH4/zephyr-chat --repo-type space
+# Download with glob filters (e.g. only safetensors weights, skip fp16 variants)
+hf download stabilityai/stable-diffusion-xl-base-1.0 \
+  --include "*.safetensors" --exclude "*.fp16.*" \
+  --local-dir ./models/sdxl
 
 # Download a specific revision (commit hash, branch, or tag)
-hf download bigcode/the-stack --repo-type dataset --revision v1.1
+hf download openai/gpt-oss-20b --revision main --local-dir ./models/gpt-oss-20b
 
-# Dry-run: see what would be downloaded without downloading
-hf download openai-community/gpt2 --dry-run
-
-# Upload a file or folder to the Hub
-# Usage: hf upload [repo_id] [local_path] [path_in_repo]
-hf upload my-org/my-model ./checkpoint-final .
-hf upload my-org/my-model ./results/metrics.json metrics.json
+# Dry-run: see what would be downloaded and total size before committing
+hf download openai/gpt-oss-20b --dry-run
 ```
 
 ### Troubleshooting
@@ -95,7 +95,7 @@ export HF_HUB_DOWNLOAD_TIMEOUT=30
 
 ## GitHub CLI
 
-The GitHub CLI (`gh`) is used to clone private repositories into a local Docker container for building and testing images before deploying to Runpod.
+The GitHub CLI (`gh`) is used to manage repositories for Runpod serverless workers. This includes cloning repos into local Docker containers for testing, versioning source code so changes can be tracked and shared with teammates or collaborators, and creating GitHub releases that publish listings to the Runpod Hub. The Hub indexes releases — not commits — so every deployment update requires a new release.
 
 ### Install
 
@@ -116,28 +116,40 @@ brew install gh
 # Linux (Alpine)
 apk add github-cli
 
-# Windows
-winget install --id GitHub.cli
+# Windows: use the Linux (Debian/Ubuntu) installer above inside your WSL2 terminal
 ```
 
 ### SSH Keys
 
-SSH keys authenticate git operations and are also used by HuggingFace. Generate one key and register it with both services.
+An SSH key identifies your machine as authentic to remote services. Generate one key and register the public key with each service that requires it — GitHub (via `gh`) and HuggingFace (via browser).
+
+**Generate a key**
 
 ```bash
-# Generate an SSH key (if you don't already have one)
 ssh-keygen -t ed25519 -C "your_email@example.com"
-# Default location: ~/.ssh/id_ed25519 (private), ~/.ssh/id_ed25519.pub (public)
+# Saves to ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public)
+# Press Enter to accept the default path; set a passphrase or leave blank
+```
 
-# Add the key to the SSH agent
+**Add the key to the SSH agent**
+
+```bash
+# macOS
+eval "$(ssh-agent -s)"
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+
+# macOS — also add to ~/.ssh/config so the key loads automatically on login:
+# Host *
+#   AddKeysToAgent yes
+#   UseKeychain yes
+#   IdentityFile ~/.ssh/id_ed25519
+
+# Linux
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
 
-# Upload the public key to GitHub
-gh ssh-key add ~/.ssh/id_ed25519.pub --title "my-machine"
+# Windows — use the Linux instructions above inside your WSL2 terminal
 ```
-
-**HuggingFace:** SSH keys must be added manually via browser at https://huggingface.co/settings/keys — paste the contents of `~/.ssh/id_ed25519.pub`.
 
 ### Credentials
 
@@ -149,16 +161,48 @@ gh auth login
 gh auth status
 ```
 
+**Register the public key with each service**
+
+```bash
+# GitHub — upload via gh CLI (requires auth above to be completed first)
+gh ssh-key add ~/.ssh/id_ed25519.pub --title "my-machine"
+
+# HuggingFace — paste contents of public key manually in browser
+cat ~/.ssh/id_ed25519.pub   # copy this output
+# Then add at https://huggingface.co/settings/keys
+```
+
 ### Key Commands
 
 ```bash
+# Repositories
+gh repo create my-worker --public             # create a new public repo (required for Hub)
 gh repo clone owner/repo                      # clone a repository over SSH
 gh repo clone owner/repo -- --depth 1        # shallow clone
-gh pr list                                    # list open PRs
-gh pr checkout 42                             # check out PR branch locally
-gh release list                               # list releases
-gh release download v1.0 --dir ./dist        # download release assets
+gh repo view owner/repo                       # view repo details and URL
+
+# Releases — the Runpod Hub indexes releases, not commits
+# Every update to a Hub listing requires a new GitHub release
+gh release create v1.0.0 --title "v1.0.0" --notes "Initial release"   # create a release
+gh release create v1.0.1 --title "v1.0.1" --notes "Update model tag"  # update Hub listing
+gh release list                               # list all releases
+gh release view v1.0.0                        # view release details
 ```
+
+#### Runpod Hub repository structure
+
+A Hub-compatible repository requires these files (in root or `.runpod/` directory):
+
+```
+handler.py        # serverless worker implementation
+Dockerfile        # container definition
+README.md         # documentation shown on Hub listing
+.runpod/
+  hub.json        # Hub metadata: title, description, category, GPU config, env vars
+  tests.json      # test cases run after each release
+```
+
+To publish: go to https://console.runpod.io → Hub → Add your repo → enter the GitHub repository URL.
 
 ---
 
@@ -188,7 +232,7 @@ sudo usermod -aG docker $USER   # allow non-root usage (re-login after)
 
 Docker Hub authentication uses a personal access token (PAT), not your account password.
 
-1. Go to https://app.docker.com/accounts/gwesterrunpod/settings/personal-access-tokens
+1. Go to https://app.docker.com → Avatar (top right) → Account Settings → Personal Access Tokens
 2. Click **Generate new token** — give it a descriptive name, set an expiration, and choose **Read & Write** access
 3. Copy the token immediately — it is shown only once
 
@@ -209,7 +253,7 @@ Use a tag that uniquely identifies the build: `v1.0.0`, `v1.0.1`, etc.
 
 ```bash
 # Correct: explicit semantic version tag
-docker build --platform linux/amd64 -t myorg/myimage:v1.0.0 .
+docker build --platform=linux/amd64 -t myorg/myimage:v1.0.0 .
 docker push myorg/myimage:v1.0.0
 
 # Wrong: latest tag is ambiguous and unreliable
@@ -260,8 +304,6 @@ docker rmi myorg/myimage:v1.0.0        # remove an image
 docker rm <container-id>               # remove a stopped container
 ```
 
-> **Platform note:** Always build with `--platform=linux/amd64`. Images built on Apple Silicon (arm64) without this flag will fail to start on Runpod.
-
 ---
 
 ## AWS CLI
@@ -288,7 +330,8 @@ Runpod uses its own S3-compatible API, not AWS. You need a Runpod user ID and S3
 
 ```bash
 # Option 1: interactive configure (writes ~/.aws/credentials and ~/.aws/config)
-# When prompted: enter user ID as access key, S3 API key as secret. Leave region and output format blank.
+# When prompted: enter user ID as access key, S3 API key as secret.
+# Leave region and output format blank — region is always passed per-command, not stored in config.
 aws configure
 
 aws configure list    # verify stored credentials
@@ -302,9 +345,16 @@ unset AWS_ACCESS_KEY_ID
 unset AWS_SECRET_ACCESS_KEY
 ```
 
-### Endpoints
+### Region and Endpoint
 
-Every command requires `--region DATACENTER` and `--endpoint-url https://s3api-DATACENTER.runpod.io/`.
+The `--region` flag on every command is the Runpod datacenter ID where the network volume lives — not an AWS region. The `--endpoint-url` is derived from the same datacenter ID.
+
+Every command requires both flags:
+```
+--region DATACENTER --endpoint-url https://s3api-DATACENTER.runpod.io/
+```
+
+**Tip:** Each network volume on the storage page at https://console.runpod.io/user/storage/ shows a pre-filled example `aws s3 ls` command with the correct `--region` and `--endpoint-url` already substituted. Use this to confirm the exact values for a given volume.
 
 Datacenter IDs by region:
 
@@ -312,8 +362,6 @@ Datacenter IDs by region:
 |--------|---------------|
 | EU | CZ-1, RO-1, IS-1, NO-1 |
 | US | CA-2, GA-2, IL-1, KS-2, MD-1, MO-1, MO-2, NC-1, NC-2, NE-1, WA-1 |
-
-The datacenter ID for your network volume is shown in the Runpod console.
 
 ### Key Commands
 
