@@ -36,7 +36,7 @@ curl -LsSf https://hf.co/cli/install.sh | bash
 # macOS (Homebrew)
 brew install hf
 
-# Windows: use the Linux standalone installer above inside your WSL2 terminal
+# Windows (WSL2): use the Linux standalone installer above
 ```
 
 > **Note:** `pip install huggingface_hub` installs the older Python CLI (`huggingface-cli`), which uses different command syntax. The commands below are for the standalone `hf` CLI.
@@ -76,8 +76,8 @@ hf download stabilityai/stable-diffusion-xl-base-1.0 \
   --include "*.safetensors" --exclude "*.fp16.*" \
   --local-dir ./models/sdxl
 
-# Download a specific revision (commit hash, branch, or tag)
-hf download meta-llama/Llama-3.1-8B --revision main --local-dir ./models/llama-3.1-8b
+# Download a specific revision (commit hash, branch, or tag — append --revision REF)
+hf download meta-llama/Llama-3.1-8B --revision v1.0 --local-dir ./models/llama-3.1-8b
 ```
 
 ### Troubleshooting
@@ -112,7 +112,7 @@ brew install gh
 # Linux (Alpine)
 apk add github-cli
 
-# Windows: use the Linux (Debian/Ubuntu) installer above inside your WSL2 terminal
+# Windows (WSL2): use the Linux (Debian/Ubuntu) installer above
 ```
 
 ### SSH Keys
@@ -146,7 +146,7 @@ ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
 
-# Windows — use the Linux instructions above inside your WSL2 terminal
+# Windows (WSL2): use the Linux instructions above
 ```
 
 ### Credentials
@@ -236,7 +236,7 @@ Docker Hub authentication uses a personal access token (PAT), not your account p
 3. Copy the token immediately — it is shown only once
 
 ```bash
-docker login -u <YOUR_DOCKERHUB_USERNAME>
+docker login -u DOCKERHUB_USERNAME
 # When prompted for a password, paste your personal access token
 ```
 
@@ -290,17 +290,17 @@ docker run --rm --gpus all myorg/myimage:v1.0.0 bash   # with GPU (requires nvid
 docker run --rm -p 8080:80 -e API_KEY=secret myorg/myimage:v1.0.0  # port mapping + env vars
 
 # Debug a running container
-docker exec -it <container-id> /bin/bash
+docker exec -it CONTAINER_ID /bin/bash
 
 # Inspect
 docker images                          # list local images
 docker ps -a                           # list all containers (including stopped)
-docker logs <container-id>             # view container output
-docker logs -f <container-id>          # follow logs in real time
+docker logs CONTAINER_ID             # view container output
+docker logs -f CONTAINER_ID          # follow logs in real time
 
 # Cleanup
 docker rmi myorg/myimage:v1.0.0        # remove an image
-docker rm <container-id>               # remove a stopped container
+docker rm CONTAINER_ID               # remove a stopped container
 ```
 
 ---
