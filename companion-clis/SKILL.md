@@ -25,7 +25,7 @@ This installs WSL2 with Ubuntu by default. After restarting, open the Ubuntu app
 
 ## HuggingFace CLI
 
-The HuggingFace CLI (`hf`) is used to download models from the Hub to your local machine so they are cached and available when you build and run the Docker container. For example, to deploy `openai/gpt-oss-20b` to a Runpod serverless endpoint: download the model locally first, build a Docker image that includes or mounts it, validate the container locally, then push the image to Docker Hub for Runpod to pull.
+The HuggingFace CLI (`hf`) is used to download models from the Hub to your local machine so they are cached and available when you build and run the Docker container. For example, to deploy `meta-llama/Llama-3.1-8B` to a Runpod serverless endpoint: download the model locally first, build a Docker image that includes or mounts it, validate the container locally, then push the image to Docker Hub for Runpod to pull.
 
 ### Install
 
@@ -34,13 +34,12 @@ The HuggingFace CLI (`hf`) is used to download models from the Hub to your local
 curl -LsSf https://hf.co/cli/install.sh | bash
 
 # macOS (Homebrew)
-brew install hf
+brew install huggingface
 
-# Any platform (pip)
-pip install -U huggingface_hub
-
-# Windows: use the Linux installer above inside your WSL2 terminal
+# Windows: use the Linux standalone installer above inside your WSL2 terminal
 ```
+
+> **Note:** `pip install huggingface_hub` installs the older Python CLI (`huggingface-cli`), which uses different command syntax. The commands below are for the standalone `hf` CLI.
 
 ### Credentials
 
@@ -66,11 +65,11 @@ hf auth logout      # delete all locally stored tokens
 
 ```bash
 # Download a model to a local directory (use --local-dir to control where it lands)
-hf download openai/gpt-oss-20b --local-dir ./models/gpt-oss-20b
 hf download meta-llama/Llama-3.1-8B --local-dir ./models/llama-3.1-8b
+hf download TinyLlama/TinyLlama-1.1B-Chat-v1.0 --local-dir ./models/tinyllama
 
 # Download a single file from a model repo
-hf download openai/gpt-oss-20b config.json --local-dir ./models/gpt-oss-20b
+hf download meta-llama/Llama-3.1-8B config.json --local-dir ./models/llama-3.1-8b
 
 # Download with glob filters (e.g. only safetensors weights, skip fp16 variants)
 hf download stabilityai/stable-diffusion-xl-base-1.0 \
@@ -78,10 +77,7 @@ hf download stabilityai/stable-diffusion-xl-base-1.0 \
   --local-dir ./models/sdxl
 
 # Download a specific revision (commit hash, branch, or tag)
-hf download openai/gpt-oss-20b --revision main --local-dir ./models/gpt-oss-20b
-
-# Dry-run: see what would be downloaded and total size before committing
-hf download openai/gpt-oss-20b --dry-run
+hf download meta-llama/Llama-3.1-8B --revision main --local-dir ./models/llama-3.1-8b
 ```
 
 ### Troubleshooting
@@ -138,11 +134,13 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 eval "$(ssh-agent -s)"
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 
-# macOS — also add to ~/.ssh/config so the key loads automatically on login:
-# Host *
-#   AddKeysToAgent yes
-#   UseKeychain yes
-#   IdentityFile ~/.ssh/id_ed25519
+# macOS — also add to ~/.ssh/config so the key loads automatically on login.
+# Create the file if it doesn't exist, and add these lines:
+#
+#   Host *
+#     AddKeysToAgent yes
+#     UseKeychain yes
+#     IdentityFile ~/.ssh/id_ed25519
 
 # Linux
 eval "$(ssh-agent -s)"
@@ -217,7 +215,8 @@ Docker is used to build and validate container images locally before pushing to 
 - Open the DMG, drag Docker to Applications, and launch it
 
 **Windows:** Download Docker Desktop from https://docs.docker.com/desktop/setup/install/windows-install/
-- Requires WSL 2 (Windows Subsystem for Linux) — Docker Desktop will prompt you to install it if missing
+- Requires WSL 2 — if you followed the WSL2 setup above, Docker Desktop will detect it automatically
+- After installation, `docker` commands work inside your WSL2 terminal without extra configuration
 - Run the installer and follow the setup wizard
 
 **Linux:** See https://docs.docker.com/engine/install/ for distro-specific instructions
@@ -331,7 +330,7 @@ Runpod uses its own S3-compatible API, not AWS. You need a Runpod user ID and S3
 ```bash
 # Option 1: interactive configure (writes ~/.aws/credentials and ~/.aws/config)
 # When prompted: enter user ID as access key, S3 API key as secret.
-# Leave region and output format blank — region is always passed per-command, not stored in config.
+# Press Enter to skip region and output format — region is always passed per-command, not stored in config.
 aws configure
 
 aws configure list    # verify stored credentials
