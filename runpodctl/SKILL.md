@@ -13,8 +13,6 @@ license: Apache-2.0
 
 Manage GPU pods, serverless endpoints, templates, volumes, and models.
 
-> **Spelling:** "Runpod" (capital R). Command is `runpodctl` (lowercase).
-
 ## Install
 
 ```bash
