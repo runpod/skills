@@ -79,7 +79,7 @@ runpodctl pod delete <pod-id>                         # Delete pod (aliases: rm,
 
 ### Hub
 
-Browse and search the RunPod Hub — a curated marketplace of deployable repos.
+Browse and search the Runpod Hub — a curated marketplace of deployable repos.
 
 ```bash
 runpodctl hub list                                    # Top 10 by stars
