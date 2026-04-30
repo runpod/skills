@@ -103,15 +103,16 @@ runpodctl serverless list                             # List all endpoints
 runpodctl serverless get <endpoint-id>                # Get endpoint details
 runpodctl serverless create --name "x" --template-id "tpl_abc"  # Create from template
 runpodctl serverless create --name "x" --hub-id <listing-id>    # Create from hub repo
+runpodctl serverless create --hub-id <id> --env MODEL_NAME=my-model  # Override hub env defaults
 runpodctl serverless update <endpoint-id> --workers-max 5       # Update endpoint
 runpodctl serverless delete <endpoint-id>             # Delete endpoint
 ```
 
-**Create from hub:** `--hub-id` resolves the hub listing, extracts the build image and config (GPU IDs, container disk), creates an inline template, and deploys. GPU IDs from the hub config are used by default; override with `--gpu-id`.
+**Create from hub:** `--hub-id` resolves the hub listing, extracts the build image and config (GPU IDs, container disk, env vars), creates an inline template, and deploys. Accepts both SERVERLESS and POD listing types. GPU IDs and env var defaults from the hub config are included automatically; override with `--gpu-id` and `--env`.
 
 **List flags:** `--include-template`, `--include-workers`
 **Update flags:** `--name`, `--workers-min`, `--workers-max`, `--idle-timeout`, `--scaler-type` (QUEUE_DELAY or REQUEST_COUNT), `--scaler-value`
-**Create flags:** `--name`, `--template-id` or `--hub-id` (one required), `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--network-volume-id`, `--data-center-ids`
+**Create flags:** `--name`, `--template-id` or `--hub-id` (one required), `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--network-volume-id`, `--data-center-ids`, `--env`
 
 ### Templates (alias: tpl)
 
