@@ -5,7 +5,7 @@ allowed-tools: Bash(runpodctl:*)
 compatibility: Linux, macOS
 metadata:
   author: runpod
-  version: "2.1"
+  version: "2.2"
 license: Apache-2.0
 ---
 
@@ -41,6 +41,8 @@ Ensure `~/.local/bin` is on your `PATH` (add `export PATH="$HOME/.local/bin:$PAT
 ```bash
 runpodctl doctor                    # First time setup (API key + SSH)
 runpodctl gpu list                  # See available GPUs
+runpodctl hub search vllm           # Find a hub repo
+runpodctl serverless create --hub-id <id> --name "my-vllm"  # Deploy from hub
 runpodctl template search pytorch   # Find a template
 runpodctl pod create --template-id runpod-torch-v21 --gpu-id "NVIDIA GeForce RTX 4090"  # Create from template
 runpodctl pod list                  # List your pods
@@ -75,19 +77,42 @@ runpodctl pod delete <pod-id>                         # Delete pod (aliases: rm,
 
 **Create flags:** `--template-id` (required if no `--image`), `--image` (required if no `--template-id`), `--name`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--ssh` (default true), `--container-disk-in-gb`, `--volume-in-gb`, `--volume-mount-path`, `--network-volume-id`, `--ports`, `--env`, `--cloud-type`, `--data-center-ids`, `--global-networking`, `--public-ip`
 
+### Hub
+
+Browse and search the Runpod Hub — a curated marketplace of deployable repos.
+
+```bash
+runpodctl hub list                                    # Top 10 by stars
+runpodctl hub list --type SERVERLESS                  # Only serverless repos
+runpodctl hub list --type POD                         # Only pod repos
+runpodctl hub list --category ai --limit 20           # Filter by category
+runpodctl hub list --order-by deploys                 # Order by deploys
+runpodctl hub list --owner runpod-workers             # Filter by repo owner
+runpodctl hub search vllm                             # Search for "vllm"
+runpodctl hub search whisper --type SERVERLESS        # Search serverless repos
+runpodctl hub get <listing-id>                        # Get by listing id
+runpodctl hub get runpod-workers/worker-vllm          # Get by owner/name
+```
+
+**List/search flags:** `--type` (POD, SERVERLESS), `--category`, `--order-by` (stars, deploys, createdAt, updatedAt, releasedAt, views), `--order-dir` (asc, desc), `--limit`, `--offset`, `--owner`
+
 ### Serverless (alias: sls)
 
 ```bash
 runpodctl serverless list                             # List all endpoints
 runpodctl serverless get <endpoint-id>                # Get endpoint details
-runpodctl serverless create --name "x" --template-id "tpl_abc"  # Create endpoint
+runpodctl serverless create --name "x" --template-id "tpl_abc"  # Create from template
+runpodctl serverless create --name "x" --hub-id <listing-id>    # Create from hub repo
+runpodctl serverless create --hub-id <id> --env MODEL_NAME=my-model  # Override hub env defaults
 runpodctl serverless update <endpoint-id> --workers-max 5       # Update endpoint
 runpodctl serverless delete <endpoint-id>             # Delete endpoint
 ```
 
+**Create from hub:** `--hub-id` resolves the hub listing, extracts the build image and config (GPU IDs, container disk, env vars), creates an inline template, and deploys. Accepts both SERVERLESS and POD listing types. GPU IDs and env var defaults from the hub config are included automatically; override with `--gpu-id` and `--env`.
+
 **List flags:** `--include-template`, `--include-workers`
 **Update flags:** `--name`, `--workers-min`, `--workers-max`, `--idle-timeout`, `--scaler-type` (QUEUE_DELAY or REQUEST_COUNT), `--scaler-value`
-**Create flags:** `--name`, `--template-id`, `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--network-volume-id`, `--data-center-ids`
+**Create flags:** `--name`, `--template-id` or `--hub-id` (one required), `--gpu-id`, `--gpu-count`, `--compute-type`, `--workers-min`, `--workers-max`, `--network-volume-id`, `--data-center-ids`, `--env`
 
 ### Templates (alias: tpl)
 
